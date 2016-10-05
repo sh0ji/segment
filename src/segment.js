@@ -301,7 +301,7 @@ class Segment {
         el.className = 'heading-link'
 
         let prev = el.previousSibling
-        let matched = this._nextUntilSameTag(el)
+        let matched = this._nextUntilSameTag(el, item)
 
         matched.forEach((elem) => {
             section.appendChild(elem)
@@ -312,13 +312,13 @@ class Segment {
 
     // collect all the elements from el to the next same tagName
     // borrowed from jQuery.nextUntil()
-    _nextUntilSameTag(el) {
+    _nextUntilSameTag(el, item) {
         let matched = []
-        let matchTag = el.tagName
         matched.push(el)
         while ((el = el.nextSibling) && el.nodeType !== 9) {
+            let level = parseInt(el.nodeName.substr(1)) || null
             if (el.nodeType === 1) {
-                if (el.tagName === matchTag) break
+                if (el.nodeName === item.name || (level && level < item.level)) break
                 matched.push(el)
             }
         }
