@@ -189,19 +189,14 @@ class Segment {
             if (i === 'length') return true
             let heading = heads[i]
 
-            // get tag (h1-h6), level (1-6), and text
-            let name = heading.tagName.toLowerCase()
-            let level = parseInt(heading.nodeName.substr(1))
-            let headingText = heading.textContent
-
             // create item object
             let item = {
-                name: name,
-                level: level,
-                id: this._constructID(headingText),
+                name: heading.tagName.toLowerCase(),
+                level: parseInt(heading.nodeName.substr(1)),
+                id: this._constructID(heading.textContent),
                 classList: heading.getAttribute('class') || null,
                 exclude: heading.classList.contains(this.config.excludeClass),
-                contents: headingText
+                contents: heading.textContent
             }
 
             // move the level iterators forward
@@ -224,7 +219,7 @@ class Segment {
             // create table of contents using the heading subset (h2-h4 by default)
             if (headings.wellStructured &&
                 this.config.createToC &&
-                this._inArray(HeadingSubset, level)) {
+                this._inArray(HeadingSubset, item.level)) {
                 // create table of contents (ToC) if desired
                 if (this.config.createToC) {
                     this._newToCItem(item)
@@ -232,10 +227,10 @@ class Segment {
             }
 
             // iterate the count
-            if (typeof headings.count[name] === 'undefined') {
-                headings.count[name] = 1
+            if (typeof headings.count[item.name] === 'undefined') {
+                headings.count[item.name] = 1
             } else {
-                headings.count[name]++
+                headings.count[item.name]++
             }
 
             // add the object to the array
