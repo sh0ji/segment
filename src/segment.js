@@ -1,16 +1,16 @@
 /**
  * --------------------------------------------------------------------------
- * Segment (v1.0.0): segment.js
+ * Segment (v1.0.1): segment.js
  * Validate and improve the semantics of an HTML document
  * by Evan Yamanishi
- * Licensed under GPL-3.0
+ * Licensed under MIT
  * --------------------------------------------------------------------------
  */
 
 'use strict'
 
 const NAME = 'segment'
-const VERSION = '1.0.0'
+const VERSION = '1.0.1'
 const NAMESPACE = 'nest'
 const HEADINGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']
 
@@ -239,6 +239,7 @@ class Segment {
             // add the object to the array
             headingMeta.items.push(item)
         }
+        delete this.doc
         return headingMeta
     }
 

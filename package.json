@@ -12,7 +12,7 @@
     "url": "git+https://github.com/sh0ji/segment.git"
   },
   "author": "Evan Yamanishi",
-  "license": "GPL-3.0",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/sh0ji/segment/issues"
   },
