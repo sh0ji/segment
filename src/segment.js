@@ -187,7 +187,7 @@ class Segment {
         // iterate over every heading in DOM order
         for (let heading of headings) {
 
-            let headingClasses = heading.getAttribute('class') || null
+            let headingClasses = heading.getAttribute('class') || ''
 
             // create object to hold heading metadata
             let item = {
@@ -197,17 +197,21 @@ class Segment {
                 excludeToc: this._contains(headingClasses, this.config.excludeClassToc),
                 id: this._constructID(heading.textContent),
                 level: parseInt(heading.nodeName.substr(1)),
-                tag: heading.tagName.toLowerCase(),
-                valid: true
+                tag: heading.tagName.toLowerCase()
             }
 
             // move the level iterators forward
             Level.previous = Level.current
             Level.current = item.level
 
-            // proceed if the heading is valid
-            if (this._validateHeading(item, heading)) {
+            // validate the heading
+            item.valid = this._validateHeading(item, heading)
 
+            // one bad heading makes the whole document poorly structured
+            if (!item.valid) headingMeta.wellStructured = false
+
+            // proceed if the heading is valid
+            if (headingMeta.wellStructured) {
                 // wrap in sections
                 // specified in the config
                 if (this.config.sectionWrap &&
@@ -230,10 +234,6 @@ class Segment {
                 } else {
                     headingMeta.count[item.tag]++
                 }
-
-            } else {
-                item.valid = false
-                headingMeta.wellStructured = false
             }
 
             // add the object to the array
