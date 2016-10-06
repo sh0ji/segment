@@ -1,9 +1,9 @@
 /**
  * --------------------------------------------------------------------------
- * Segment (v1.0.0): segment.js
+ * Segment (v1.0.1): segment.js
  * Validate and improve the semantics of an HTML document
  * by Evan Yamanishi
- * Licensed under GPL-3.0
+ * Licensed under MIT
  * --------------------------------------------------------------------------
  */
 
@@ -18,7 +18,7 @@ var _createClass = function () { function defineProperties(target, props) { for 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 var NAME = 'segment';
-var VERSION = '1.0.0';
+var VERSION = '1.0.1';
 var NAMESPACE = 'nest';
 var HEADINGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
 
@@ -28,19 +28,19 @@ var PageIDs = [];
 var Level = {
     current: 0,
     previous: 0,
-    previousToc: null,
+    previousEl: null,
     parent: null
 };
 
 var Default = {
     createToC: true,
-    excludeClass: 'toc-exclude',
-    excludeAll: true,
-    tocClass: NAMESPACE + '-contents',
-    start: 2,
-    end: 4,
+    excludeClassSection: 'sec-exclude',
+    excludeClassToc: 'toc-exclude',
+    start: 1,
+    end: 6,
     sectionClass: 'section-container',
-    sectionWrap: true
+    sectionWrap: true,
+    tocClass: NAMESPACE + '-contents'
 };
 
 // errors borrowed from Khan Academy's tota11y library
@@ -207,77 +207,100 @@ var Segment = function () {
             }
         }
     }, {
-        key: '_inArray',
-        value: function _inArray(array, value) {
+        key: '_contains',
+        value: function _contains(array, value) {
             return array.indexOf(value) >= 0;
         }
     }, {
         key: '_getHeadings',
         value: function _getHeadings() {
-            var heads = this.doc.querySelectorAll(HEADINGS.toString());
+            var headings = this.doc.querySelectorAll(HEADINGS.toString());
 
             // initialize the headings object
-            var headings = {
+            var headingMeta = {
                 count: {},
                 items: [],
-                length: heads.length,
+                length: headings.length,
                 wellStructured: true
             };
 
             // iterate over every heading in DOM order
-            for (var i in heads) {
-                if (i === 'length') return true;
-                var heading = heads[i];
+            var _iteratorNormalCompletion2 = true;
+            var _didIteratorError2 = false;
+            var _iteratorError2 = undefined;
 
-                // get tag (h1-h6), level (1-6), and text
-                var name = heading.tagName.toLowerCase();
-                var level = parseInt(heading.nodeName.substr(1));
-                var headingText = heading.textContent;
+            try {
+                for (var _iterator2 = headings[Symbol.iterator](), _step2; !(_iteratorNormalCompletion2 = (_step2 = _iterator2.next()).done); _iteratorNormalCompletion2 = true) {
+                    var heading = _step2.value;
 
-                // create item object
-                var item = {
-                    name: name,
-                    level: level,
-                    id: this._constructID(headingText),
-                    classList: heading.getAttribute('class') || null,
-                    exclude: heading.classList.contains(this.config.excludeClass),
-                    contents: headingText
-                };
 
-                // move the level iterators forward
-                Level.previous = Level.current;
-                Level.current = item.level;
+                    var headingClasses = heading.getAttribute('class') || null;
 
-                // validate the heading
-                var valid = this._validateHeading(item, heading);
+                    // create object to hold heading metadata
+                    var item = {
+                        classString: headingClasses,
+                        contents: heading.textContent,
+                        excludeSection: this._contains(headingClasses, this.config.excludeClassSection),
+                        excludeToc: this._contains(headingClasses, this.config.excludeClassToc),
+                        id: this._constructID(heading.textContent),
+                        level: parseInt(heading.nodeName.substr(1)),
+                        tag: heading.tagName.toLowerCase(),
+                        valid: true
+                    };
 
-                // one invalid heading makes the whole document poorly structured
-                if (!valid) headings.wellStructured = false;
+                    // move the level iterators forward
+                    Level.previous = Level.current;
+                    Level.current = item.level;
 
-                // wrap in sections if desired
-                if (headings.wellStructured && this.config.sectionWrap && item.level >= this.config.start) {
-                    this._sectionWrap(heading, item);
+                    // proceed if the heading is valid
+                    if (this._validateHeading(item, heading)) {
+
+                        // wrap in sections
+                        // specified in the config
+                        if (this.config.sectionWrap &&
+                        // current heading level is >= the specified start level
+                        item.level >= this.config.start &&
+                        // the current heading shouldn't be excluded
+                        !item.excludeSection) {
+                            this._sectionWrap(heading, item);
+                        }
+
+                        // create table of contents using the specified heading subset (h1-h6 by default)
+                        if (this.config.createToC && this._contains(HeadingSubset, item.level)) {
+                            this._addTocItem(item);
+                        }
+
+                        // iterate the count
+                        if (typeof headingMeta.count[item.tag] === 'undefined') {
+                            headingMeta.count[item.tag] = 1;
+                        } else {
+                            headingMeta.count[item.tag]++;
+                        }
+                    } else {
+                        item.valid = false;
+                        headingMeta.wellStructured = false;
+                    }
+
+                    // add the object to the array
+                    headingMeta.items.push(item);
                 }
-
-                // create table of contents using the heading subset (h2-h4 by default)
-                if (headings.wellStructured && this.config.createToC && this._inArray(HeadingSubset, level)) {
-                    // create table of contents (ToC) if desired
-                    if (this.config.createToC) {
-                        this._newToCItem(item);
+            } catch (err) {
+                _didIteratorError2 = true;
+                _iteratorError2 = err;
+            } finally {
+                try {
+                    if (!_iteratorNormalCompletion2 && _iterator2.return) {
+                        _iterator2.return();
+                    }
+                } finally {
+                    if (_didIteratorError2) {
+                        throw _iteratorError2;
                     }
                 }
-
-                // iterate the count
-                if (typeof headings.count[name] === 'undefined') {
-                    headings.count[name] = 1;
-                } else {
-                    headings.count[name]++;
-                }
-
-                // add the object to the array
-                headings.items.push(item);
             }
-            return headings;
+
+            delete this.doc;
+            return headingMeta;
         }
     }, {
         key: '_createHeadingSubset',
@@ -298,27 +321,27 @@ var Segment = function () {
         key: '_getPageIDs',
         value: function _getPageIDs() {
             var ids = this.doc.querySelectorAll('[id]');
-            var _iteratorNormalCompletion2 = true;
-            var _didIteratorError2 = false;
-            var _iteratorError2 = undefined;
+            var _iteratorNormalCompletion3 = true;
+            var _didIteratorError3 = false;
+            var _iteratorError3 = undefined;
 
             try {
-                for (var _iterator2 = ids[Symbol.iterator](), _step2; !(_iteratorNormalCompletion2 = (_step2 = _iterator2.next()).done); _iteratorNormalCompletion2 = true) {
-                    var item = _step2.value;
+                for (var _iterator3 = ids[Symbol.iterator](), _step3; !(_iteratorNormalCompletion3 = (_step3 = _iterator3.next()).done); _iteratorNormalCompletion3 = true) {
+                    var item = _step3.value;
 
                     PageIDs.push(item.getAttribute('id'));
                 }
             } catch (err) {
-                _didIteratorError2 = true;
-                _iteratorError2 = err;
+                _didIteratorError3 = true;
+                _iteratorError3 = err;
             } finally {
                 try {
-                    if (!_iteratorNormalCompletion2 && _iterator2.return) {
-                        _iterator2.return();
+                    if (!_iteratorNormalCompletion3 && _iterator3.return) {
+                        _iterator3.return();
                     }
                 } finally {
-                    if (_didIteratorError2) {
-                        throw _iteratorError2;
+                    if (_didIteratorError3) {
+                        throw _iteratorError3;
                     }
                 }
             }
@@ -335,20 +358,19 @@ var Segment = function () {
             .replace(/[^A-Za-z0-9]+/g, '-').replace(/-$/g, '').toLowerCase();
 
             // append a number if the id isn't unique
-            if (this._inArray(PageIDs, id)) {
+            if (this._contains(PageIDs, id)) {
                 var root = id;
                 var n = 0;
                 do {
                     n++;
                     id = root + '-' + n;
-                } while (this._inArray(PageIDs, id));
+                } while (this._contains(PageIDs, id));
             }
             return id;
         }
     }, {
         key: '_sectionWrap',
         value: function _sectionWrap(el, item) {
-            if (item.exclude && this.config.excludeAll) return true;
 
             if (el.parentElement.tagName === 'SECTION' && el.parentElement.className !== this.config.sectionClass) {
                 this._postError(Error.PRE_EXISTING_SECTION(item.level, el));
@@ -369,7 +391,7 @@ var Segment = function () {
             el.className = 'heading-link';
 
             var prev = el.previousSibling;
-            var matched = this._nextUntilSameTag(el);
+            var matched = this._nextUntilSameTag(el, item);
 
             matched.forEach(function (elem) {
                 section.appendChild(elem);
@@ -383,13 +405,13 @@ var Segment = function () {
 
     }, {
         key: '_nextUntilSameTag',
-        value: function _nextUntilSameTag(el) {
+        value: function _nextUntilSameTag(el, item) {
             var matched = [];
-            var matchTag = el.tagName;
             matched.push(el);
             while ((el = el.nextSibling) && el.nodeType !== 9) {
+                var level = parseInt(el.nodeName.substr(1)) || null;
                 if (el.nodeType === 1) {
-                    if (el.tagName === matchTag) break;
+                    if (el.nodeName === item.tag || level && level < item.level) break;
                     matched.push(el);
                 }
             }
@@ -403,29 +425,33 @@ var Segment = function () {
             return toc;
         }
     }, {
-        key: '_newToCItem',
-        value: function _newToCItem(item) {
+        key: '_addTocItem',
+        value: function _addTocItem(item) {
             var li = this._createListItem(item);
             var depth = item.level - this.config.start;
-            if (this._inArray(HeadingSubset, Level.previous)) Level.previousToc = Level.previous;
-            var change = item.level - Level.previousToc;
+            if (this._contains(HeadingSubset, Level.previous)) Level.previousEl = Level.previous;
+            var change = item.level - Level.previousEl;
 
             if (depth === 0) {
                 Level.parent = this.toc;
             } else if (change > 0) {
                 var ul = this.doc.createElement('ul');
-                ul.className = this.config.tocClass + '--' + item.name;
+                ul.className = this.config.tocClass + '--' + item.tag;
                 Level.parent.lastChild.appendChild(ul);
                 Level.parent = ul;
             } else if (change < 0) {
-                Level.parent = $(Level.parent).parents().eq(Math.abs(change));
+                var i = 0;
+                while (i < Math.abs(change)) {
+                    Level.parent = Level.parent.parentElement;
+                    if (Level.parent.nodeName === 'UL') i++;
+                }
             }
             Level.parent.appendChild(li);
         }
     }, {
         key: '_createListItem',
         value: function _createListItem(item) {
-            if (item.exclude) return;
+            if (item.excludeToc) return;
             var li = this.doc.createElement('li');
             li.className = this.config.tocClass + '__item';
             var tocLink = this.doc.createElement('a');
