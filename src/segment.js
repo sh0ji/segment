@@ -20,19 +20,19 @@ const PageIDs = []
 const Level = {
     current: 0,
     previous: 0,
-    previousToc: null,
+    previousEl: null,
     parent: null
 }
 
 const Default = {
     createToC: true,
-    excludeClass: 'toc-exclude',
-    excludeAll: true,
-    tocClass: `${NAMESPACE}-contents`,
-    start: 2,
-    end: 4,
+    excludeClassSection: 'sec-exclude',
+    excludeClassToc: 'toc-exclude',
+    start: 1,
+    end: 6,
     sectionClass: 'section-container',
-    sectionWrap: true
+    sectionWrap: true,
+    tocClass: `${NAMESPACE}-contents`
 }
 
 // errors borrowed from Khan Academy's tota11y library
@@ -145,7 +145,7 @@ class Segment {
             this._postError(Error.FIRST_NOT_H1(item.level, el))
             return false
 
-            // non-consecutive headings
+        // non-consecutive headings
         } else if (Level.previous !== 0 && item.level - Level.previous > 1) {
             this._postError(Error.NONCONSECUTIVE_HEADER(Level.previous, item.level, el))
             return false
@@ -169,74 +169,77 @@ class Segment {
         }
     }
 
-    _inArray(array, value) {
+    _contains(array, value) {
         return array.indexOf(value) >= 0
     }
 
     _getHeadings() {
-        let heads = this.doc.querySelectorAll(HEADINGS.toString())
+        let headings = this.doc.querySelectorAll(HEADINGS.toString())
 
         // initialize the headings object
-        let headings = {
+        let headingMeta = {
             count: {},
             items: [],
-            length: heads.length,
+            length: headings.length,
             wellStructured: true
         }
 
         // iterate over every heading in DOM order
-        for (let i in heads) {
-            if (i === 'length') return true
-            let heading = heads[i]
+        for (let heading of headings) {
 
-            // create item object
+            let headingClasses = heading.getAttribute('class') || null
+
+            // create object to hold heading metadata
             let item = {
-                name: heading.tagName.toLowerCase(),
-                level: parseInt(heading.nodeName.substr(1)),
+                classString: headingClasses,
+                contents: heading.textContent,
+                excludeSection: this._contains(headingClasses, this.config.excludeClassSection),
+                excludeToc: this._contains(headingClasses, this.config.excludeClassToc),
                 id: this._constructID(heading.textContent),
-                classList: heading.getAttribute('class') || null,
-                exclude: heading.classList.contains(this.config.excludeClass),
-                contents: heading.textContent
+                level: parseInt(heading.nodeName.substr(1)),
+                tag: heading.tagName.toLowerCase(),
+                valid: true
             }
 
             // move the level iterators forward
             Level.previous = Level.current
             Level.current = item.level
 
-            // validate the heading
-            let valid = this._validateHeading(item, heading)
+            // proceed if the heading is valid
+            if (this._validateHeading(item, heading)) {
 
-            // one invalid heading makes the whole document poorly structured
-            if (!valid) headings.wellStructured = false
-
-            // wrap in sections if desired
-            if (headings.wellStructured &&
-                this.config.sectionWrap &&
-                item.level >= this.config.start) {
-                this._sectionWrap(heading, item)
-            }
-
-            // create table of contents using the heading subset (h2-h4 by default)
-            if (headings.wellStructured &&
-                this.config.createToC &&
-                this._inArray(HeadingSubset, item.level)) {
-                // create table of contents (ToC) if desired
-                if (this.config.createToC) {
-                    this._newToCItem(item)
+                // wrap in sections
+                // specified in the config
+                if (this.config.sectionWrap &&
+                    // current heading level is >= the specified start level
+                    item.level >= this.config.start &&
+                    // the current heading shouldn't be excluded
+                    !item.excludeSection) {
+                    this._sectionWrap(heading, item)
                 }
-            }
 
-            // iterate the count
-            if (typeof headings.count[item.name] === 'undefined') {
-                headings.count[item.name] = 1
+                // create table of contents using the specified heading subset (h1-h6 by default)
+                if (this.config.createToC &&
+                    this._contains(HeadingSubset, item.level)) {
+                    this._addTocItem(item)
+                }
+
+                // iterate the count
+                if (typeof headingMeta.count[item.tag] === 'undefined') {
+                    headingMeta.count[item.tag] = 1
+                } else {
+                    headingMeta.count[item.tag]++
+                }
+
             } else {
-                headings.count[item.name]++
+                item.valid = false
+                headingMeta.wellStructured = false
             }
 
             // add the object to the array
-            headings.items.push(item)
+            headingMeta.items.push(item)
         }
-        return headings
+        return headingMeta
     }
 
     _createHeadingSubset() {
@@ -267,19 +270,18 @@ class Segment {
             .replace(/[^A-Za-z0-9]+/g, '-').replace(/-$/g, '').toLowerCase()
 
         // append a number if the id isn't unique
-        if (this._inArray(PageIDs, id)) {
+        if (this._contains(PageIDs, id)) {
             let root = id
             let n = 0
             do {
                 n++
                 id = `${root}-${n}`
-            } while (this._inArray(PageIDs, id))
+            } while (this._contains(PageIDs, id))
         }
         return id
     }
 
     _sectionWrap(el, item) {
-        if (item.exclude && this.config.excludeAll) return true
 
         if (el.parentElement.tagName === 'SECTION' &&
             el.parentElement.className !== this.config.sectionClass) {
@@ -318,7 +320,7 @@ class Segment {
         while ((el = el.nextSibling) && el.nodeType !== 9) {
             let level = parseInt(el.nodeName.substr(1)) || null
             if (el.nodeType === 1) {
-                if (el.nodeName === item.name || (level && level < item.level)) break
+                if (el.nodeName === item.tag || (level && level < item.level)) break
                 matched.push(el)
             }
         }
@@ -331,27 +333,31 @@ class Segment {
         return toc
     }
 
-    _newToCItem(item) {
+    _addTocItem(item) {
         let li = this._createListItem(item)
         let depth = item.level - this.config.start
-        if (this._inArray(HeadingSubset, Level.previous)) Level.previousToc = Level.previous
-        let change = item.level - Level.previousToc
+        if (this._contains(HeadingSubset, Level.previous)) Level.previousEl = Level.previous
+        let change = item.level - Level.previousEl
 
         if (depth === 0) {
             Level.parent = this.toc
         } else if (change > 0) {
             let ul = this.doc.createElement('ul')
-            ul.className = `${this.config.tocClass}--${item.name}`
+            ul.className = `${this.config.tocClass}--${item.tag}`
             Level.parent.lastChild.appendChild(ul)
             Level.parent = ul
         } else if (change < 0) {
-            Level.parent = $(Level.parent).parents().eq(Math.abs(change))
+            let i = 0
+            while (i < Math.abs(change)) {
+                Level.parent = Level.parent.parentElement
+                if (Level.parent.nodeName === 'UL') i++
+            }
         }
         Level.parent.appendChild(li)
     }
 
     _createListItem(item) {
-        if (item.exclude) return
+        if (item.excludeToc) return
         let li = this.doc.createElement('li')
         li.className = `${this.config.tocClass}__item`
         let tocLink = this.doc.createElement('a')
