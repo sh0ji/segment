@@ -141,13 +141,13 @@ class Segment {
 
     _validateHeading(item, el) {
         // first heading not h1
-        if (Level.previous === 0 && item.level !== 1) {
-            this._postError(Error.FIRST_NOT_H1(item.level, el))
+        if (Level.previous === 0 && item.levelAbsolute !== 1) {
+            this._postError(Error.FIRST_NOT_H1(item.levelAbsolute, el))
             return false
 
         // non-consecutive headings
-        } else if (Level.previous !== 0 && item.level - Level.previous > 1) {
-            this._postError(Error.NONCONSECUTIVE_HEADER(Level.previous, item.level, el))
+        } else if (Level.previous !== 0 && item.levelAbsolute - Level.previous > 1) {
+            this._postError(Error.NONCONSECUTIVE_HEADER(Level.previous, item.levelAbsolute, el))
             return false
         }
         return true
@@ -196,13 +196,14 @@ class Segment {
                 excludeSection: this._contains(headingClasses, this.config.excludeClassSection),
                 excludeToc: this._contains(headingClasses, this.config.excludeClassToc),
                 id: this._constructID(heading.textContent),
-                level: parseInt(heading.nodeName.substr(1)),
+                levelAbsolute: parseInt(heading.nodeName.substr(1)),
+                levelRelative: parseInt(heading.nodeName.substr(1)) - this.config.start + 1,
                 tag: heading.tagName.toLowerCase()
             }
 
             // move the level iterators forward
             Level.previous = Level.current
-            Level.current = item.level
+            Level.current = item.levelAbsolute
 
             // validate the heading
             item.valid = this._validateHeading(item, heading)
@@ -216,7 +217,7 @@ class Segment {
                 // specified in the config
                 if (this.config.sectionWrap &&
                     // current heading level is >= the specified start level
-                    item.level >= this.config.start &&
+                    item.levelAbsolute >= this.config.start &&
                     // the current heading shouldn't be excluded
                     !item.excludeSection) {
                     this._sectionWrap(heading, item)
@@ -224,7 +225,7 @@ class Segment {
 
                 // create table of contents using the specified heading subset (h1-h6 by default)
                 if (this.config.createToC &&
-                    this._contains(HeadingSubset, item.level) &&
+                    this._contains(HeadingSubset, item.levelAbsolute) &&
                     !item.excludeToc) {
                     this._addTocItem(item)
                 }
@@ -287,13 +288,28 @@ class Segment {
 
         if (el.parentElement.tagName === 'SECTION' &&
             el.parentElement.className !== this.config.sectionClass) {
-            this._postError(Error.PRE_EXISTING_SECTION(item.level, el))
+            this._postError(Error.PRE_EXISTING_SECTION(item.levelAbsolute, el))
         }
 
         // create the section container
         let section = this.doc.createElement('section')
         section.setAttribute('id', item.id)
+        section.dataset.level = item.levelRelative
         section.className = this.config.sectionClass
+
+        // attach the section to the correct place in the DOM
+        let parent = el.parentNode
+        if (parseInt(parent.dataset.level) === item.levelRelative) {
+            parent.parentNode.insertBefore(section, parent.nextElementSibling)
+        } else {
+            parent.insertBefore(section, el)
+        }
+
+        // populate the section element
+        let matched = this._nextUntilSameTag(el, item)
+        matched.forEach((elem) => {
+            section.appendChild(elem)
+        })
 
         // replace the heading text with a non-tabbable anchor that
         // references the section
@@ -303,15 +319,6 @@ class Segment {
         anchor.textContent = item.contents
         el.innerHTML = anchor.outerHTML
         el.className = 'heading-link'
-
-        let prev = el.previousSibling
-        let matched = this._nextUntilSameTag(el, item)
-
-        matched.forEach((elem) => {
-            section.appendChild(elem)
-        })
-
-        if (prev) prev.parentNode.insertBefore(section, prev.nextSibling)
     }
 
     // collect all the elements from el to the next same tagName
@@ -322,7 +329,7 @@ class Segment {
         while ((el = el.nextSibling) && el.nodeType !== 9) {
             let level = parseInt(el.nodeName.substr(1)) || null
             if (el.nodeType === 1) {
-                if (el.nodeName === item.tag || (level && level < item.level)) break
+                if (el.nodeName === item.tag || (level && level < item.levelAbsolute)) break
                 matched.push(el)
             }
         }
@@ -337,9 +344,9 @@ class Segment {
 
     _addTocItem(item) {
         let li = this._createListItem(item)
-        let depth = item.level - this.config.start
+        let depth = item.levelAbsolute - this.config.start
         if (this._contains(HeadingSubset, Level.previous)) Level.previousEl = Level.previous
-        let change = item.level - Level.previousEl
+        let change = item.levelAbsolute - Level.previousEl
 
         if (depth === 0) {
             Level.parent = this.toc
