@@ -1,6 +1,6 @@
 /**
  * --------------------------------------------------------------------------
- * Segment (v1.0.1): segment.js
+ * Segment (v1.0.3): segment.js
  * Validate and improve the semantics of an HTML document
  * by Evan Yamanishi
  * Licensed under MIT
@@ -18,7 +18,7 @@ var _createClass = function () { function defineProperties(target, props) { for 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 var NAME = 'segment';
-var VERSION = '1.0.1';
+var VERSION = '1.0.3';
 var NAMESPACE = 'nest';
 var HEADINGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
 
@@ -234,7 +234,7 @@ var Segment = function () {
                     var heading = _step2.value;
 
 
-                    var headingClasses = heading.getAttribute('class') || null;
+                    var headingClasses = heading.getAttribute('class') || '';
 
                     // create object to hold heading metadata
                     var item = {
@@ -244,17 +244,21 @@ var Segment = function () {
                         excludeToc: this._contains(headingClasses, this.config.excludeClassToc),
                         id: this._constructID(heading.textContent),
                         level: parseInt(heading.nodeName.substr(1)),
-                        tag: heading.tagName.toLowerCase(),
-                        valid: true
+                        tag: heading.tagName.toLowerCase()
                     };
 
                     // move the level iterators forward
                     Level.previous = Level.current;
                     Level.current = item.level;
 
-                    // proceed if the heading is valid
-                    if (this._validateHeading(item, heading)) {
+                    // validate the heading
+                    item.valid = this._validateHeading(item, heading);
 
+                    // one bad heading makes the whole document poorly structured
+                    if (!item.valid) headingMeta.wellStructured = false;
+
+                    // proceed if the heading is valid
+                    if (headingMeta.wellStructured) {
                         // wrap in sections
                         // specified in the config
                         if (this.config.sectionWrap &&
@@ -266,7 +270,7 @@ var Segment = function () {
                         }
 
                         // create table of contents using the specified heading subset (h1-h6 by default)
-                        if (this.config.createToC && this._contains(HeadingSubset, item.level)) {
+                        if (this.config.createToC && this._contains(HeadingSubset, item.level) && !item.excludeToc) {
                             this._addTocItem(item);
                         }
 
@@ -276,9 +280,6 @@ var Segment = function () {
                         } else {
                             headingMeta.count[item.tag]++;
                         }
-                    } else {
-                        item.valid = false;
-                        headingMeta.wellStructured = false;
                     }
 
                     // add the object to the array
