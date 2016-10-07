@@ -1,6 +1,6 @@
 /**
  * --------------------------------------------------------------------------
- * Segment (v1.0.4): segment.js
+ * Segment (v1.0.5): segment.js
  * Validate and improve the semantics of an HTML document
  * by Evan Yamanishi
  * Licensed under MIT
@@ -18,9 +18,10 @@ var _createClass = function () { function defineProperties(target, props) { for 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 var NAME = 'segment';
-var VERSION = '1.0.4';
+var VERSION = '1.0.5';
 var NAMESPACE = 'nest';
 var HEADINGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
+var DATA_LEVEL = 'data-level';
 
 // initialize private(ish) variables
 var HeadingSubset = [];
@@ -381,12 +382,12 @@ var Segment = function () {
             // create the section container
             var section = this.doc.createElement('section');
             section.setAttribute('id', item.id);
-            section.dataset.level = item.levelRelative;
+            section.setAttribute(DATA_LEVEL, item.levelRelative);
             section.className = this.config.sectionClass;
 
             // attach the section to the correct place in the DOM
             var parent = el.parentNode;
-            if (parseInt(parent.dataset.level) === item.levelRelative) {
+            if (parseInt(parent.getAttribute(DATA_LEVEL)) === item.levelRelative) {
                 parent.parentNode.insertBefore(section, parent.nextElementSibling);
             } else {
                 parent.insertBefore(section, el);
