@@ -1,6 +1,6 @@
 /**
  * --------------------------------------------------------------------------
- * Segment (v1.0.3): segment.js
+ * Segment (v1.0.4): segment.js
  * Validate and improve the semantics of an HTML document
  * by Evan Yamanishi
  * Licensed under MIT
@@ -18,7 +18,7 @@ var _createClass = function () { function defineProperties(target, props) { for 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 var NAME = 'segment';
-var VERSION = '1.0.3';
+var VERSION = '1.0.4';
 var NAMESPACE = 'nest';
 var HEADINGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
 
@@ -178,13 +178,13 @@ var Segment = function () {
         key: '_validateHeading',
         value: function _validateHeading(item, el) {
             // first heading not h1
-            if (Level.previous === 0 && item.level !== 1) {
-                this._postError(Error.FIRST_NOT_H1(item.level, el));
+            if (Level.previous === 0 && item.levelAbsolute !== 1) {
+                this._postError(Error.FIRST_NOT_H1(item.levelAbsolute, el));
                 return false;
 
                 // non-consecutive headings
-            } else if (Level.previous !== 0 && item.level - Level.previous > 1) {
-                this._postError(Error.NONCONSECUTIVE_HEADER(Level.previous, item.level, el));
+            } else if (Level.previous !== 0 && item.levelAbsolute - Level.previous > 1) {
+                this._postError(Error.NONCONSECUTIVE_HEADER(Level.previous, item.levelAbsolute, el));
                 return false;
             }
             return true;
@@ -243,13 +243,14 @@ var Segment = function () {
                         excludeSection: this._contains(headingClasses, this.config.excludeClassSection),
                         excludeToc: this._contains(headingClasses, this.config.excludeClassToc),
                         id: this._constructID(heading.textContent),
-                        level: parseInt(heading.nodeName.substr(1)),
+                        levelAbsolute: parseInt(heading.nodeName.substr(1)),
+                        levelRelative: parseInt(heading.nodeName.substr(1)) - this.config.start + 1,
                         tag: heading.tagName.toLowerCase()
                     };
 
                     // move the level iterators forward
                     Level.previous = Level.current;
-                    Level.current = item.level;
+                    Level.current = item.levelAbsolute;
 
                     // validate the heading
                     item.valid = this._validateHeading(item, heading);
@@ -263,14 +264,14 @@ var Segment = function () {
                         // specified in the config
                         if (this.config.sectionWrap &&
                         // current heading level is >= the specified start level
-                        item.level >= this.config.start &&
+                        item.levelAbsolute >= this.config.start &&
                         // the current heading shouldn't be excluded
                         !item.excludeSection) {
                             this._sectionWrap(heading, item);
                         }
 
                         // create table of contents using the specified heading subset (h1-h6 by default)
-                        if (this.config.createToC && this._contains(HeadingSubset, item.level) && !item.excludeToc) {
+                        if (this.config.createToC && this._contains(HeadingSubset, item.levelAbsolute) && !item.excludeToc) {
                             this._addTocItem(item);
                         }
 
@@ -374,13 +375,28 @@ var Segment = function () {
         value: function _sectionWrap(el, item) {
 
             if (el.parentElement.tagName === 'SECTION' && el.parentElement.className !== this.config.sectionClass) {
-                this._postError(Error.PRE_EXISTING_SECTION(item.level, el));
+                this._postError(Error.PRE_EXISTING_SECTION(item.levelAbsolute, el));
             }
 
             // create the section container
             var section = this.doc.createElement('section');
             section.setAttribute('id', item.id);
+            section.dataset.level = item.levelRelative;
             section.className = this.config.sectionClass;
+
+            // attach the section to the correct place in the DOM
+            var parent = el.parentNode;
+            if (parseInt(parent.dataset.level) === item.levelRelative) {
+                parent.parentNode.insertBefore(section, parent.nextElementSibling);
+            } else {
+                parent.insertBefore(section, el);
+            }
+
+            // populate the section element
+            var matched = this._nextUntilSameTag(el, item);
+            matched.forEach(function (elem) {
+                section.appendChild(elem);
+            });
 
             // replace the heading text with a non-tabbable anchor that
             // references the section
@@ -390,15 +406,6 @@ var Segment = function () {
             anchor.textContent = item.contents;
             el.innerHTML = anchor.outerHTML;
             el.className = 'heading-link';
-
-            var prev = el.previousSibling;
-            var matched = this._nextUntilSameTag(el, item);
-
-            matched.forEach(function (elem) {
-                section.appendChild(elem);
-            });
-
-            if (prev) prev.parentNode.insertBefore(section, prev.nextSibling);
         }
 
         // collect all the elements from el to the next same tagName
@@ -412,7 +419,7 @@ var Segment = function () {
             while ((el = el.nextSibling) && el.nodeType !== 9) {
                 var level = parseInt(el.nodeName.substr(1)) || null;
                 if (el.nodeType === 1) {
-                    if (el.nodeName === item.tag || level && level < item.level) break;
+                    if (el.nodeName === item.tag || level && level < item.levelAbsolute) break;
                     matched.push(el);
                 }
             }
@@ -429,9 +436,9 @@ var Segment = function () {
         key: '_addTocItem',
         value: function _addTocItem(item) {
             var li = this._createListItem(item);
-            var depth = item.level - this.config.start;
+            var depth = item.levelAbsolute - this.config.start;
             if (this._contains(HeadingSubset, Level.previous)) Level.previousEl = Level.previous;
-            var change = item.level - Level.previousEl;
+            var change = item.levelAbsolute - Level.previousEl;
 
             if (depth === 0) {
                 Level.parent = this.toc;
