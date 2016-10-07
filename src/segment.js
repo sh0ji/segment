@@ -224,7 +224,8 @@ class Segment {
 
                 // create table of contents using the specified heading subset (h1-h6 by default)
                 if (this.config.createToC &&
-                    this._contains(HeadingSubset, item.level)) {
+                    this._contains(HeadingSubset, item.level) &&
+                    !item.excludeToc) {
                     this._addTocItem(item)
                 }
 
