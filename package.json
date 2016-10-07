@@ -1,6 +1,6 @@
 {
   "name": "html-segment",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Validate and improve the semantics of an HTML document",
   "main": "dist/segment.js",
   "scripts": {
