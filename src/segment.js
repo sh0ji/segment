@@ -1,6 +1,6 @@
 /**
  * --------------------------------------------------------------------------
- * Segment (v1.0.3): segment.js
+ * Segment (v1.0.4): segment.js
  * Validate and improve the semantics of an HTML document
  * by Evan Yamanishi
  * Licensed under MIT
@@ -10,7 +10,7 @@
 'use strict'
 
 const NAME = 'segment'
-const VERSION = '1.0.3'
+const VERSION = '1.0.4'
 const NAMESPACE = 'nest'
 const HEADINGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']
 
