@@ -96,11 +96,11 @@ var Segment = function () {
 
         _classCallCheck(this, Segment);
 
-        // doc must be a DOCUMENT_NODE (9) or ELEMENT_NODE (1) nodeType
-        if (doc.nodeType === 9 || doc.nodeType === 1) {
-            this.doc = doc;
-        } else {
+        // doc must be a DOCUMENT_NODE (nodeType 9)
+        if (doc.nodeType !== 9) {
             console.error('Valid document required.');
+        } else {
+            this.doc = doc;
         }
 
         // build the configuration from defaults
