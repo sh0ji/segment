@@ -6,6 +6,7 @@
   "scripts": {
     "build": "babel src -d dist",
     "prepublish": "npm run build"
+    "build-browser": "browserify src/segment.js -s html-segment -t [ babelify --presets [ es2015 ] --plugins [ add-module-exports ] ] | derequire > dist/segment.browser.js",
   },
   "repository": {
     "type": "git",
