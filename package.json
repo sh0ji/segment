@@ -2,13 +2,8 @@
   "name": "html-segment",
   "version": "1.1.0",
   "description": "Wrap headings and their contents in semantic section containers",
-  "main": "dist/segment.module.js",
-  "scripts": {
-    "clean": "del-cli dist/*",
-    "build-browser": "browserify src/segment.js -s html-segment -t [ babelify --presets [ es2015 ] --plugins [ add-module-exports ] ] | derequire > dist/segment.browser.js",
-    "build-node": "babel src/segment.js -o dist/segment.module.js",
-    "prepublish": "npm run build-browser & npm run build-node"
-  },
+  "main": "index.js",
+  "scripts": {},
   "repository": {
     "type": "git",
     "url": "git+https://github.com/sh0ji/segment.git"
@@ -20,12 +15,13 @@
   },
   "homepage": "https://github.com/sh0ji/segment#readme",
   "devDependencies": {
-    "babel-cli": "^6.14.0",
-    "babel-plugin-add-module-exports": "^0.2.1",
-    "babel-preset-es2015": "^6.14.0",
-    "babelify": "^7.3.0",
-    "browserify": "^13.1.0",
-    "del-cli": "^0.2.0",
-    "derequire": "^2.0.3"
+    "eslint": "^3.15.0",
+    "eslint-config-airbnb": "^14.1.0",
+    "eslint-plugin-import": "^2.2.0",
+    "eslint-plugin-jsx-a11y": "^4.0.0",
+    "eslint-plugin-react": "^6.10.0"
+  },
+  "dependencies": {
+    "web-id": "^1.0.0"
   }
 }
