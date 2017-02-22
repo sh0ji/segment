@@ -5,8 +5,10 @@
  * @license MIT
  */
 
+const chalk = require('chalk');
 const WebId = require('web-id');
-const assert = require('assert');
+
+const nodejs = (typeof module !== 'undefined' && module.exports);
 
 const HEADINGS = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6'];
 const Err = {
@@ -51,10 +53,28 @@ const Err = {
     },
 };
 
+const Default = {
+    sectionClass: 'doc-section',
+    anchorClass: 'section-link',
+};
+
 class Segment {
-    constructor(doc) {
+    constructor(doc, config) {
         this.doc = doc || document; // eslint-disable-line no-undef
         this.errors = [];
+        this.config = config || {};
+    }
+
+    get debug() {
+        return this.config.debug || false;
+    }
+
+    get sectionClass() {
+        return this.config.sectionClass || Default.sectionClass;
+    }
+
+    get anchorClass() {
+        return this.config.anchorClass || Default.anchorClass;
     }
 
     get headings() {
@@ -67,7 +87,7 @@ class Segment {
 
     get validStructure() {
         if (this.headings.length === 0) {
-            this.addError(Err.NO_HEADINGS_FOUND());
+            this.handleError(Err.NO_HEADINGS_FOUND());
             return false;
         }
 
@@ -86,35 +106,55 @@ class Segment {
         let valid = true;
         if (currentLvl !== 1 && !prevLvl) {
             valid = false;
-            this.addError(Err.FIRST_NOT_H1(currentEl, currentLvl));
+            this.handleError(Err.FIRST_NOT_H1(currentEl, currentLvl));
         }
 
         if (currentLvl - prevLvl > 1) {
             valid = false;
-            this.addError(Err.NONCONSECUTIVE_HEADER(currentEl, currentLvl, prevLvl));
+            this.handleError(Err.NONCONSECUTIVE_HEADER(currentEl, currentLvl, prevLvl));
         }
         return valid;
     }
 
-    addError(err) {
+    handleError(err) {
+        if (this.debug) {
+            /* eslint-disable */
+            let message = (nodejs) ?
+                chalk.red(err.title) + '\n' +
+                chalk.yellow(err.description) :
+                `${err.title}\n${err.description}`;
+            if (err.element) {
+                message += (nodejs) ?
+                    '\n' + chalk.cyan(err.element.outerHTML) :
+                    `\nProblem heading: ${err.element.outerHTML}`;
+            }
+            console.warn(message);
+            /* eslint-enable */
+        }
         this.errors.push(err);
     }
 
-    logErrors() {
-        /* eslint-disable no-console */
-        console.error('The heading structure is invalid.');
-        this.errors.forEach((err) => {
-            console.warn(`${err.title}\n${err.description}`);
-        });
-        /* eslint-enable no-console */
-    }
-
     segment() {
-        if (this.validStructure) {
-            this.headings.forEach(this.wrapHeading);
-        } else {
-            this.logErrors();
-        }
+        return new Promise((resolve, reject) => {
+            const sections = [];
+            if (this.validStructure) {
+                this.headings.forEach((el) => {
+                    this.wrapHeading(el)
+                        .then((section) => {
+                            sections.push(section);
+                        })
+                        .catch(err => this.handleError(err));
+                });
+            } else {
+                reject(this.errors);
+            }
+            resolve(sections);
+        }).catch(() => {
+            if (!this.debug) {
+                throw new Error('Something went wrong.' +
+                'Please catch errors or try again with --debug');
+            }
+        });
     }
 
     wrapHeading(heading) {
@@ -123,9 +163,16 @@ class Segment {
             section.id = this.idFromString(heading.textContent);
             section.className = this.sectionClass;
 
+            const parent = heading.parentNode;
+            if (parent.nodeName.toUpperCase() === 'SECTION' &&
+                parent.id === section.id) {
+                reject(Err.PRE_EXISTING_SECTION(heading, Segment.headingLevel(heading)));
+            }
+
             try {
-                this.nextUntilSameTag(heading)
+                Segment.nextUntilSameHead(heading)
                     .forEach(sib => section.appendChild(sib));
+                parent.insertBefore(section, heading);
             } catch (err) {
                 reject(err);
             }
@@ -135,7 +182,11 @@ class Segment {
             anchor.class = this.anchorClass;
             anchor.textContent = heading.textContent;
 
-            heading.innerHtml = anchor; // eslint-disable-line no-param-reassign
+            while (heading.firstChild) {
+                heading.firstChild.remove();
+            }
+            heading.appendChild(anchor);
+            section.insertBefore(heading, section.firstChild);
             resolve(section);
         });
     }
@@ -149,29 +200,31 @@ class Segment {
         return id.iter;
     }
 
-    static nextUntilSameTag(el) {
-        const orig = {
-            nodeName: el.nodeName,
-            lvl: Segment.headingLevel(el),
-        };
+    /**
+     * Get an array of sibling elements between the current element and the next
+     * same tag (e.g. all elements between H2s)
+     * Does not include the current element or the next same tag
+     * @param {Object} el - An element node (Node of .nodeType ELEMENT_NODE)
+     * @return {Array}
+     */
+    static nextUntilSameHead(el) {
+        const lvl = Segment.headingLevel(el);
         const matched = [];
-        matched.push(el);
-        let elem = el;
-        while ((elem = el.nextSibling) && elem.nodeType !== 9) {    // eslint-disable-line
-            if (elem.nodeType === 1) {
-                const lvl = Segment.headingLevel(elem);
-                if (elem.nodeName === orig.nodeName || (lvl && lvl < orig.lvl)) {
+        let next = el;
+        while ((next = next.nextSibling) && next.nodeType !== 9) { // eslint-disable-line
+            if (next.nodeType === 1) {
+                if (next.nodeName === el.nodeName ||
+                    (Segment.headingLevel(next) < lvl)) {
                     break;
                 }
-                matched.push(elem);
+                matched.push(next);
             }
         }
         return matched;
     }
 
     static headingLevel(el) {
-        assert(/h[1-6]/i.test(el.tagName), `${el.tagName} is not a heading element.`);
-        return Number(el.tagName.charAt(1));
+        return Number(el.tagName.charAt(1)) || 10;
     }
 }
 
