@@ -5,10 +5,8 @@
  * @license MIT
  */
 
-const chalk = require('chalk');
 const WebId = require('web-id');
-
-const nodejs = (typeof module !== 'undefined' && module.exports);
+const EventEmitter = require('events').EventEmitter;
 
 const HEADINGS = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6'];
 const Err = {
@@ -16,7 +14,7 @@ const Err = {
         return {
             title: 'First heading is not an <h1>.',
             description: `To give your document a proper structure for assistive technologies, it is important to lay out your headings beginning with an <h1>. The first heading was an <h${currentLvl}>.`,
-            element: el,
+            element: el
         };
     },
     NONCONSECUTIVE_HEADER(el, currentLvl, prevLvl) {
@@ -33,7 +31,7 @@ const Err = {
         return {
             title: `Nonconsecutive heading level used (h${prevLvl} → h${currentLvl}).`,
             description: desc,
-            element: el,
+            element: el
         };
     },
 
@@ -41,28 +39,33 @@ const Err = {
     NO_HEADINGS_FOUND() {
         return {
             title: 'No headings found.',
-            description: 'Please ensure that all headings are properly tagged.',
+            description: 'Please ensure that all headings are properly tagged.'
         };
     },
     PRE_EXISTING_SECTION(el, currentLvl) {
         return {
             title: 'Pre-existing <section> tag',
             description: `The current <h${currentLvl}> is already the direct child of a <section> tag.`,
-            element: el,
+            element: el
         };
-    },
+    }
 };
 
 const Default = {
     sectionClass: 'doc-section',
-    anchorClass: 'section-link',
+    anchorClass: 'section-link'
 };
 
-class Segment {
+class Segment extends EventEmitter {
     constructor(doc, config) {
+        super();
         this.doc = doc || document; // eslint-disable-line no-undef
-        this.errors = [];
         this.config = config || {};
+        this.errors = [];
+        this.sections = [];
+
+        this.on('error', err => this.errors.push(err));
+        this.on('segment', section => this.sections.push(section));
     }
 
     get debug() {
@@ -116,49 +119,17 @@ class Segment {
         return valid;
     }
 
-    handleError(err) {
-        if (this.debug) {
-            /* eslint-disable */
-            let message = (nodejs) ?
-                chalk.red(err.title) + '\n' +
-                chalk.yellow(err.description) :
-                `${err.title}\n${err.description}`;
-            if (err.element) {
-                message += (nodejs) ?
-                    '\n' + chalk.cyan(err.element.outerHTML) :
-                    `\nProblem heading: ${err.element.outerHTML}`;
-            }
-            console.warn(message);
-            /* eslint-enable */
-        }
-        this.errors.push(err);
-    }
-
     segment() {
-        return new Promise((resolve, reject) => {
-            const sections = [];
-            if (this.validStructure) {
-                this.headings.forEach((el) => {
-                    this.wrapHeading(el)
-                        .then((section) => {
-                            sections.push(section);
-                        })
-                        .catch(err => this.handleError(err));
-                });
-            } else {
-                reject(this.errors);
-            }
-            resolve(sections);
-        }).catch(() => {
-            if (!this.debug) {
-                throw new Error('Something went wrong.' +
-                'Please catch errors or try again with --debug');
-            }
-        });
+        if (this.validStructure) {
+            this.headings.forEach((el) => {
+                this.emit('segment', this.wrapHeading(el));
+            });
+            this.emit('segmented');
+        }
     }
 
     wrapHeading(heading) {
-        return new Promise((resolve, reject) => {
+        try {
             const section = this.doc.createElement('section');
             section.id = this.idFromString(heading.textContent);
             section.className = this.sectionClass;
@@ -166,7 +137,7 @@ class Segment {
             const parent = heading.parentNode;
             if (parent.nodeName.toUpperCase() === 'SECTION' &&
                 parent.id === section.id) {
-                reject(Err.PRE_EXISTING_SECTION(heading, Segment.headingLevel(heading)));
+                this.handleError(Err.PRE_EXISTING_SECTION(heading, Segment.headingLevel(heading)));
             }
 
             try {
@@ -174,7 +145,7 @@ class Segment {
                     .forEach(sib => section.appendChild(sib));
                 parent.insertBefore(section, heading);
             } catch (err) {
-                reject(err);
+                this.handleError(err);
             }
 
             const anchor = this.doc.createElement('a');
@@ -187,8 +158,19 @@ class Segment {
             }
             heading.appendChild(anchor);
             section.insertBefore(heading, section.firstChild);
-            resolve(section);
-        });
+            return section;
+        } catch (err) {
+            this.handleError(err);
+            return err;
+        }
+    }
+
+    handleError(err) {
+        let message = `${err.title} ${err.description}`;
+        if (err.element) {
+            message += `\nProblem heading: ${err.element.outerHTML}`;
+        }
+        this.emit('error', message);
     }
 
     idFromString(str) {
