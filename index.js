@@ -69,21 +69,9 @@ class Segment extends EventEmitter {
     constructor(doc, config) {
         super();
         this.doc = doc || document; // eslint-disable-line no-undef
-        this.config = config || {};
+        this.config = Object.assign({}, Default, config);
         this.errors = [];
         this.sections = [];
-    }
-
-    get sectionClass() {
-        return this.config.sectionClass || Default.sectionClass;
-    }
-
-    get anchorClass() {
-        return this.config.anchorClass || Default.anchorClass;
-    }
-
-    get maxLength() {
-        return this.config.maxLength || Default.maxLength;
     }
 
     get headings() {
@@ -140,7 +128,7 @@ class Segment extends EventEmitter {
         try {
             const section = this.doc.createElement('section');
             section.id = this.idFromString(heading.textContent);
-            section.className = this.sectionClass;
+            section.className = this.config.sectionClass;
 
             const parent = heading.parentNode;
             if (parent.nodeName.toUpperCase() === 'SECTION' &&
@@ -159,7 +147,7 @@ class Segment extends EventEmitter {
 
             const anchor = this.doc.createElement('a');
             anchor.href = `#${section.id}`;
-            anchor.class = this.anchorClass;
+            anchor.class = this.config.anchorClass;
             anchor.textContent = heading.textContent;
 
             while (heading.firstChild) {
@@ -180,9 +168,9 @@ class Segment extends EventEmitter {
             id.iterate();
         }
         let newId = id.iter;
-        if (id.iter.length > this.maxLength) {
-            newId = newId.substring(0, this.maxLength);
-            this.handleError(Err.LONG_HEADING(newId, this.maxLength));
+        if (id.iter.length > this.config.maxLength) {
+            newId = newId.substring(0, this.config.maxLength);
+            this.handleError(Err.LONG_HEADING(newId, this.config.maxLength));
         }
         this.ids.push(newId);
         return newId;
