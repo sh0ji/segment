@@ -35,7 +35,6 @@ const Err = {
             ref: el.outerHTML
         };
     },
-
     // additional errors not in tota11y
     NO_HEADINGS_FOUND() {
         return {
