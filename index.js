@@ -10,11 +10,12 @@ const EventEmitter = require('events').EventEmitter;
 
 const HEADINGS = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6'];
 const Err = {
+    // errors adapted from tota11y
     FIRST_NOT_H1(el, currentLvl) {
         return {
             title: 'First heading is not an <h1>.',
             description: `To give your document a proper structure for assistive technologies, it is important to lay out your headings beginning with an <h1>. The first heading was an <h${currentLvl}>.`,
-            element: el
+            ref: el.outerHTML
         };
     },
     NONCONSECUTIVE_HEADER(el, currentLvl, prevLvl) {
@@ -31,7 +32,7 @@ const Err = {
         return {
             title: `Nonconsecutive heading level used (h${prevLvl} → h${currentLvl}).`,
             description: desc,
-            element: el
+            ref: el.outerHTML
         };
     },
 
@@ -46,14 +47,22 @@ const Err = {
         return {
             title: 'Pre-existing <section> tag',
             description: `The current <h${currentLvl}> is already the direct child of a <section> tag.`,
-            element: el
+            element: el.outerHTML
+        };
+    },
+    LONG_HEADING(id, maxLength) {
+        return {
+            title: 'Unusually long heading.',
+            description: `The heading text is over ${maxLength} characters long.`,
+            ref: id
         };
     }
 };
 
 const Default = {
     sectionClass: 'doc-section',
-    anchorClass: 'section-link'
+    anchorClass: 'section-link',
+    maxLength: 125
 };
 
 class Segment extends EventEmitter {
@@ -63,13 +72,6 @@ class Segment extends EventEmitter {
         this.config = config || {};
         this.errors = [];
         this.sections = [];
-
-        this.on('error', err => this.errors.push(err));
-        this.on('segment', section => this.sections.push(section));
-    }
-
-    get debug() {
-        return this.config.debug || false;
     }
 
     get sectionClass() {
@@ -78,6 +80,10 @@ class Segment extends EventEmitter {
 
     get anchorClass() {
         return this.config.anchorClass || Default.anchorClass;
+    }
+
+    get maxLength() {
+        return this.config.maxLength || Default.maxLength;
     }
 
     get headings() {
@@ -122,7 +128,9 @@ class Segment extends EventEmitter {
     segment() {
         if (this.validStructure) {
             this.headings.forEach((el) => {
-                this.emit('segment', this.wrapHeading(el));
+                const section = this.wrapHeading(el);
+                this.emit('segment', section);
+                this.sections.push(section.id);
             });
             this.emit('segmented');
         }
@@ -137,7 +145,8 @@ class Segment extends EventEmitter {
             const parent = heading.parentNode;
             if (parent.nodeName.toUpperCase() === 'SECTION' &&
                 parent.id === section.id) {
-                this.handleError(Err.PRE_EXISTING_SECTION(heading, Segment.headingLevel(heading)));
+                const lvl = Segment.headingLevel(heading);
+                this.handleError(Err.PRE_EXISTING_SECTION(heading, lvl));
             }
 
             try {
@@ -165,21 +174,32 @@ class Segment extends EventEmitter {
         }
     }
 
-    handleError(err) {
-        let message = `${err.title} ${err.description}`;
-        if (err.element) {
-            message += `\nProblem heading: ${err.element.outerHTML}`;
-        }
-        this.emit('error', message);
-    }
-
     idFromString(str) {
         const id = new WebId(str);
         while (this.ids.includes(id.iter)) {
             id.iterate();
         }
-        this.ids.push(id.iter);
-        return id.iter;
+        let newId = id.iter;
+        if (id.iter.length > this.maxLength) {
+            newId = newId.substring(0, this.maxLength);
+            this.handleError(Err.LONG_HEADING(newId, this.maxLength));
+        }
+        this.ids.push(newId);
+        return newId;
+    }
+
+    handleError(err) {
+        const error = (err.constructor === Object) ? Segment.createError(err) : err;
+        this.emit('error', error);
+        this.errors.push(error.message);
+    }
+
+    static createError(err) {
+        let message = `${err.title} ${err.description}`;
+        if (err.ref) {
+            message += `\nReference: ${err.ref}`;
+        }
+        return new Error(message);
     }
 
     /**
