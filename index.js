@@ -162,12 +162,13 @@ class Segment extends EventEmitter {
     }
 
     idFromString(str) {
-        const id = new WebId(str);
-        while (this.ids.includes(id.iter)) {
-            id.iterate();
+        const webid = new WebId();
+        webid.generate(str);
+        while (this.ids.includes(webid.iter)) {
+            webid.iterate();
         }
-        let newId = id.iter;
-        if (id.iter.length > this.config.maxLength) {
+        let newId = webid.iter;
+        if (newId.length > this.config.maxLength) {
             newId = newId.substring(0, this.config.maxLength);
             this.handleError(Err.LONG_HEADING(newId, this.config.maxLength));
         }
