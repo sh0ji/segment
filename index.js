@@ -61,7 +61,8 @@ const Err = {
 const Default = {
     sectionClass: 'doc-section',
     anchorClass: 'section-link',
-    maxLength: 125
+    maxLength: 125,
+    headingAnchor: true,
 };
 
 class Segment extends EventEmitter {
@@ -143,16 +144,18 @@ class Segment extends EventEmitter {
             } catch (err) {
                 this.handleError(err);
             }
-
-            const anchor = this.doc.createElement('a');
-            anchor.href = `#${section.id}`;
-            anchor.class = this.config.anchorClass;
-            anchor.textContent = heading.textContent;
-
-            while (heading.firstChild) {
-                heading.firstChild.remove();
+            
+            if (this.config.headingAnchor) {
+                const anchor = this.doc.createElement('a');
+                anchor.href = `#${section.id}`;
+                anchor.class = this.config.anchorClass;
+                anchor.textContent = heading.textContent;
+    
+                while (heading.firstChild) {
+                    heading.firstChild.remove();
+                }
+                heading.appendChild(anchor);
             }
-            heading.appendChild(anchor);
             section.insertBefore(heading, section.firstChild);
             return section;
         } catch (err) {
