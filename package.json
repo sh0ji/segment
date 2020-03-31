@@ -3,7 +3,9 @@
   "version": "2.0.0",
   "description": "Wrap headings and their contents in semantic section containers",
   "main": "index.js",
-  "scripts": {},
+  "scripts": {
+    "lint": "eslint ."
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/sh0ji/segment.git"
@@ -15,15 +17,11 @@
   },
   "homepage": "https://github.com/sh0ji/segment#readme",
   "devDependencies": {
-    "eslint": "^3.15.0",
-    "eslint-config-airbnb": "^14.1.0",
-    "eslint-plugin-import": "^2.2.0",
-    "eslint-plugin-jsx-a11y": "^4.0.0",
-    "eslint-plugin-react": "^6.10.0",
-    "jsdom": "^9.11.0"
+    "eslint": "^6.8.0",
+    "eslint-config-airbnb-base": "^14.1.0",
+    "eslint-plugin-import": "^2.20.2"
   },
   "dependencies": {
-    "chalk": "^1.1.3",
     "web-id": "^1.1.4"
   }
 }
