@@ -1,6 +1,6 @@
 {
   "name": "html-segment",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Wrap headings and their contents in semantic section containers",
   "main": "index.js",
   "scripts": {
