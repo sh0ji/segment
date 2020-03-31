@@ -6,7 +6,7 @@
  */
 
 const WebId = require('web-id');
-const EventEmitter = require('events').EventEmitter;
+const { EventEmitter } = require('events');
 
 const HEADINGS = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6'];
 const Err = {
@@ -15,7 +15,7 @@ const Err = {
         return {
             title: 'First heading is not an <h1>.',
             description: `To give your document a proper structure for assistive technologies, it is important to lay out your headings beginning with an <h1>. The first heading was an <h${currentLvl}>.`,
-            ref: el.outerHTML
+            ref: el.outerHTML,
         };
     },
     NONCONSECUTIVE_HEADER(el, currentLvl, prevLvl) {
@@ -32,30 +32,30 @@ const Err = {
         return {
             title: `Nonconsecutive heading level used (h${prevLvl} → h${currentLvl}).`,
             description: desc,
-            ref: el.outerHTML
+            ref: el.outerHTML,
         };
     },
     // additional errors not in tota11y
     NO_HEADINGS_FOUND() {
         return {
             title: 'No headings found.',
-            description: 'Please ensure that all headings are properly tagged.'
+            description: 'Please ensure that all headings are properly tagged.',
         };
     },
     PRE_EXISTING_SECTION(el, currentLvl) {
         return {
             title: 'Pre-existing <section> tag',
             description: `The current <h${currentLvl}> is already the direct child of a <section> tag.`,
-            element: el.outerHTML
+            element: el.outerHTML,
         };
     },
     LONG_HEADING(id, maxLength) {
         return {
             title: 'Unusually long heading.',
             description: `The heading text is over ${maxLength} characters long.`,
-            ref: id
+            ref: id,
         };
-    }
+    },
 };
 
 const Default = {
@@ -69,7 +69,7 @@ class Segment extends EventEmitter {
     constructor(doc, config) {
         super();
         this.doc = doc || document; // eslint-disable-line no-undef
-        this.config = Object.assign({}, Default, config);
+        this.config = { ...Default, ...config };
         this.errors = [];
         this.sections = [];
     }
@@ -79,7 +79,7 @@ class Segment extends EventEmitter {
     }
 
     get ids() {
-        return Array.from(this.doc.querySelectorAll('[id]')).map(el => el.id);
+        return Array.from(this.doc.querySelectorAll('[id]')).map((el) => el.id);
     }
 
     get validStructure() {
@@ -93,7 +93,7 @@ class Segment extends EventEmitter {
             const valid = this.compareHeadings(el, prev);
             prev = el;
             return valid;
-        }).every(v => v);
+        }).every((v) => v);
     }
 
     compareHeadings(currentEl, prevEl) {
@@ -131,26 +131,26 @@ class Segment extends EventEmitter {
             section.className = this.config.sectionClass;
 
             const parent = heading.parentNode;
-            if (parent.nodeName.toUpperCase() === 'SECTION' &&
-                parent.id === section.id) {
+            if (parent.nodeName.toUpperCase() === 'SECTION'
+                && parent.id === section.id) {
                 const lvl = Segment.headingLevel(heading);
                 this.handleError(Err.PRE_EXISTING_SECTION(heading, lvl));
             }
 
             try {
                 Segment.nextUntilSameHead(heading)
-                    .forEach(sib => section.appendChild(sib));
+                    .forEach((sib) => section.appendChild(sib));
                 parent.insertBefore(section, heading);
             } catch (err) {
                 this.handleError(err);
             }
-            
+
             if (this.config.headingAnchor) {
                 const anchor = this.doc.createElement('a');
                 anchor.href = `#${section.id}`;
                 anchor.class = this.config.anchorClass;
                 anchor.textContent = heading.textContent;
-    
+
                 while (heading.firstChild) {
                     heading.firstChild.remove();
                 }
@@ -206,8 +206,8 @@ class Segment extends EventEmitter {
         let next = el;
         while ((next = next.nextSibling) && next.nodeType !== 9) { // eslint-disable-line
             if (next.nodeType === 1) {
-                if (next.nodeName === el.nodeName ||
-                    (Segment.headingLevel(next) < lvl)) {
+                if (next.nodeName === el.nodeName
+                    || (Segment.headingLevel(next) < lvl)) {
                     break;
                 }
                 matched.push(next);
